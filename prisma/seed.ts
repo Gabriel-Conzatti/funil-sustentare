@@ -40,21 +40,27 @@ async function main() {
   });
   console.log(`✅ Admin: ${admin.username} / ${adminEmail}`);
 
-  const consultor = await prisma.user.upsert({
-    where: { email: "consultor@sustentare.com" },
-    update: {},
-    create: {
-      name: "João",
-      lastName: "Consultor",
-      fullName: "João Consultor",
-      email: "consultor@sustentare.com",
-      username: "joao",
-      passwordHash: await bcrypt.hash("Joao@123", 10),
-      role: "USER",
-      status: "ATIVO",
-      color: "#00cbff",
-    },
-  });
+  // Dados de demonstração (usuário, funil e clientes de exemplo) só quando SEED_DEMO=true.
+  const seedDemo = process.env.SEED_DEMO === "true";
+
+  let consultor = admin;
+  if (seedDemo) {
+    consultor = await prisma.user.upsert({
+      where: { email: "consultor@sustentare.com" },
+      update: {},
+      create: {
+        name: "João",
+        lastName: "Consultor",
+        fullName: "João Consultor",
+        email: "consultor@sustentare.com",
+        username: "joao",
+        passwordHash: await bcrypt.hash("Joao@123", 10),
+        role: "USER",
+        status: "ATIVO",
+        color: "#00cbff",
+      },
+    });
+  }
 
   // Origens
   for (const name of DEFAULT_ORIGINS) {
@@ -69,7 +75,7 @@ async function main() {
 
   // Funil de exemplo (removível — nada é fixo no código)
   const existing = await prisma.funnel.findFirst({ where: { name: "Seguro Auto" } });
-  if (!existing) {
+  if (seedDemo && !existing) {
     const funnel = await prisma.funnel.create({
       data: {
         name: "Seguro Auto",

@@ -1,0 +1,38 @@
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: funil
+      MYSQL_USER: funil
+      MYSQL_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no arquivo .env}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?defina DB_ROOT_PASSWORD no arquivo .env}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "mysql://funil:${DB_PASSWORD}@db:3306/funil"
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?defina JWT_ACCESS_SECRET no .env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?defina JWT_REFRESH_SECRET no .env}
+      ACCESS_TOKEN_TTL: "8h"
+      REFRESH_TOKEN_TTL: "7d"
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@sustentare.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?defina ADMIN_PASSWORD no .env}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      SEED_DEMO: "false"
+    ports:
+      - "3000:3000"
+
+volumes:
+  db_data:
