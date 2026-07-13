@@ -1,0 +1,360 @@
+// Funil Sustentare — schema Prisma
+// DEV: SQLite (provider "sqlite"). PROD Hostinger: trocar provider para "mysql".
+// Campos "enum-like" usam String (constantes em src/lib/constants.ts) para
+// manter portabilidade entre SQLite e MySQL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------------
+// USUÁRIOS / PERMISSÕES / SESSÕES
+// ------------------------------------------------------------------
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  lastName     String?
+  fullName     String
+  email        String    @unique
+  phone        String?
+  whatsapp     String?
+  role         String    @default("USER") // ADMIN | USER (extensível)
+  jobTitle     String?
+  username     String    @unique
+  passwordHash String
+  status       String    @default("ATIVO") // ATIVO|INATIVO|BLOQUEADO|FERIAS|DESLIGADO
+  photoUrl     String?
+  color        String    @default("#a8c8ff")
+  notes        String?
+
+  loginAttempts Int      @default(0)
+  lastLoginAt   DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  clients       Client[]       @relation("ClientResponsible")
+  sessions      Session[]
+  logs          AuditLog[]
+  histories     ClientHistory[]
+  observations  Observation[]
+
+  @@index([status])
+  @@index([role])
+}
+
+model Session {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  ip           String?
+  userAgent    String?
+  browser      String?
+  os           String?
+  device       String?
+  refreshToken String?
+  lastActivity DateTime  @default(now())
+  expiresAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// ------------------------------------------------------------------
+// FUNIS / ETAPAS
+// ------------------------------------------------------------------
+
+model Funnel {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  icon        String    @default("filter")
+  color       String    @default("#00cbff")
+  status      String    @default("ATIVO") // ATIVO|INATIVO
+  order       Int       @default(0)
+  notes       String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  stages   Stage[]
+  clients  Client[]
+  lists    ClientList[] @relation("ListFunnels")
+
+  @@index([status])
+}
+
+model Stage {
+  id          String    @id @default(cuid())
+  funnelId    String
+  funnel      Funnel    @relation(fields: [funnelId], references: [id], onDelete: Cascade)
+  name        String
+  color       String    @default("#a8c8ff")
+  icon        String    @default("circle")
+  description String?
+  defaultMessage String?
+  recommendedTime String?
+  order       Int       @default(0)
+  status      String    @default("ATIVO")
+  notes       String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  clients  Client[]
+  messages Message[]
+
+  @@index([funnelId])
+}
+
+// ------------------------------------------------------------------
+// CLIENTES
+// ------------------------------------------------------------------
+
+model Client {
+  id           String  @id @default(cuid())
+  fullName     String
+  phone        String
+  ddd          String?
+  whatsapp     String?
+  cpf          String?
+  rg           String?
+  birthDate    DateTime?
+  email        String?
+
+  cep          String?
+  state        String?
+  city         String?
+  district     String?
+  street       String?
+  number       String?
+  complement   String?
+
+  company      String?
+  jobTitle     String?
+  notes        String?
+
+  estimatedValue Float?
+  closedValue    Float?
+  insurer        String?
+  product        String?
+  plate          String?
+  vehicleModel   String?
+  vehicleYear    String?
+  renewal        String?
+  dueDate        DateTime?
+
+  status       String  @default("ATIVO") // ATIVO|ARQUIVADO|PERDIDO|CONVERTIDO|CANCELADO
+  lostReason   String?
+  movedAt      DateTime @default(now())
+
+  funnelId     String?
+  funnel       Funnel?  @relation(fields: [funnelId], references: [id])
+  stageId      String?
+  stage        Stage?   @relation(fields: [stageId], references: [id])
+  responsibleId String?
+  responsible  User?   @relation("ClientResponsible", fields: [responsibleId], references: [id])
+  originId     String?
+  origin       Origin? @relation(fields: [originId], references: [id])
+  listId       String?
+  list         ClientList? @relation(fields: [listId], references: [id])
+
+  tags         ClientTag[]
+  observations Observation[]
+  histories    ClientHistory[]
+  messagesSent SentMessage[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([phone])
+  @@index([cpf])
+  @@index([email])
+  @@index([fullName])
+  @@index([status])
+  @@index([funnelId])
+  @@index([stageId])
+  @@index([responsibleId])
+  @@index([listId])
+}
+
+// Lista/lote de clientes (Importada ou Criada manualmente).
+model ClientList {
+  id        String    @id @default(cuid())
+  name      String
+  source    String    @default("MANUAL") // MANUAL | IMPORTADA
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  funnels   Funnel[]  @relation("ListFunnels")
+  clients   Client[]
+}
+
+model Origin {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  clients   Client[]
+}
+
+model Tag {
+  id        String      @id @default(cuid())
+  name      String      @unique
+  color     String      @default("#00cbff")
+  createdAt DateTime    @default(now())
+  clients   ClientTag[]
+}
+
+model ClientTag {
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tagId    String
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([clientId, tagId])
+}
+
+model Observation {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([clientId])
+}
+
+model ClientHistory {
+  id          String   @id @default(cuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  type        String   // CRIADO|MENSAGEM|MOVIMENTACAO|RESPONSAVEL|VENDA|PERDA|OBSERVACAO|TAG|ARQUIVADO|RESTAURADO
+  description String
+  ip          String?
+  createdAt   DateTime @default(now())
+
+  @@index([clientId])
+}
+
+// ------------------------------------------------------------------
+// MENSAGENS / TEMPLATES
+// ------------------------------------------------------------------
+
+model Template {
+  id        String    @id @default(cuid())
+  name      String
+  category  String?
+  content   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  messages  Message[]
+}
+
+model Message {
+  id              String    @id @default(cuid())
+  title           String
+  description     String?
+  content         String
+  status          String    @default("ATIVO")
+  category        String?
+  emoji           String?
+  color           String    @default("#a8c8ff")
+  recommendedTime String?
+  notes           String?
+  isDefault       Boolean   @default(false)
+
+  stageId    String?
+  stage      Stage?    @relation(fields: [stageId], references: [id])
+  templateId String?
+  template   Template? @relation(fields: [templateId], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  versions MessageVersion[]
+  sent     SentMessage[]
+
+  @@index([stageId])
+}
+
+model MessageVersion {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([messageId])
+}
+
+model SentMessage {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  messageId String?
+  message   Message? @relation(fields: [messageId], references: [id])
+  userId    String?
+  content   String
+  phone     String
+  status    String   @default("SUCESSO") // TENTATIVA|SUCESSO|FALHA|CANCELAMENTO
+  createdAt DateTime @default(now())
+
+  @@index([clientId])
+}
+
+// ------------------------------------------------------------------
+// AUDITORIA / CONFIG / METAS
+// ------------------------------------------------------------------
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  entity      String   // Client | Funnel | Stage | Message | User | Auth ...
+  entityId    String?
+  action      String   // CREATE|UPDATE|DELETE|LOGIN|LOGOUT|IMPORT|EXPORT ...
+  description String?
+  ip          String?
+  browser     String?
+  os          String?
+  oldValue    String?
+  newValue    String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([entity])
+}
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model Goal {
+  id        String   @id @default(cuid())
+  name      String
+  target    Float
+  period    String   // MENSAL|ANUAL...
+  createdAt DateTime @default(now())
+}

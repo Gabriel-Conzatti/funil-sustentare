@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background-color: #101415;
+  color: #e0e3e5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar discreta no tema dark */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #0b0f10;
+}
+::-webkit-scrollbar-thumb {
+  background: #323537;
+  border-radius: 9999px;
+  border: 2px solid #0b0f10;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #43474f;
+}
+
+@layer components {
+  /* Botões */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-label-md font-medium transition-all
+      disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface;
+  }
+  .btn-primary {
+    @apply btn bg-accent text-white hover:brightness-110 focus:ring-accent;
+  }
+  .btn-secondary {
+    @apply btn border border-cyan-signal/40 text-secondary hover:border-cyan-signal hover:bg-cyan-signal/10 focus:ring-cyan-signal;
+  }
+  .btn-ghost {
+    @apply btn text-content-variant hover:bg-surface-high hover:text-content;
+  }
+  .btn-danger {
+    @apply btn bg-danger-container text-danger-on-container hover:brightness-110 focus:ring-danger;
+  }
+
+  /* Cards */
+  .card {
+    @apply rounded-lg border border-cyan-signal/15 bg-surface-container p-5 transition-shadow;
+  }
+  .card-hover {
+    @apply card hover:border-cyan-signal/40 hover:shadow-lg hover:shadow-black/30;
+  }
+
+  /* Inputs */
+  .label {
+    @apply mb-1.5 block text-label-md text-content-variant;
+  }
+  .input {
+    @apply w-full rounded-md border border-cyan-signal/20 bg-surface-lowest px-3 py-2 text-body-md text-content
+      placeholder:text-outline transition-colors focus:border-cyan-signal focus:outline-none focus:ring-1 focus:ring-cyan-signal;
+  }
+  .textarea {
+    @apply input min-h-[96px] resize-y;
+  }
+
+  /* Badges */
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-label-sm uppercase;
+  }
+}
