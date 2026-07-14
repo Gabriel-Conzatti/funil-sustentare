@@ -99,3 +99,44 @@ export async function addStage(formData: FormData): Promise<{ ok: boolean; error
   revalidatePath("/funis");
   return { ok: true };
 }
+
+export async function deleteStage(stageId: string): Promise<{ ok: boolean; error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Não autenticado." };
+
+  const stage = await prisma.stage.findFirst({ where: { id: stageId, deletedAt: null } });
+  if (!stage) return { ok: false, error: "Etapa não encontrada." };
+
+  const siblings = await prisma.stage.findMany({
+    where: { funnelId: stage.funnelId, deletedAt: null, id: { not: stageId } },
+    orderBy: { order: "asc" },
+  });
+  if (siblings.length === 0) {
+    return { ok: false, error: "Não é possível excluir a única etapa do funil." };
+  }
+
+  // Move os clientes desta etapa para a etapa anterior (ou a primeira restante).
+  const target = [...siblings].reverse().find((s) => s.order < stage.order) || siblings[0];
+  const moved = await prisma.client.updateMany({
+    where: { stageId, deletedAt: null },
+    data: { stageId: target.id, movedAt: new Date() },
+  });
+
+  await prisma.stage.update({
+    where: { id: stageId },
+    data: { deletedAt: new Date() },
+  });
+
+  await audit({
+    userId: user.id,
+    entity: "Stage",
+    entityId: stageId,
+    action: "DELETE",
+    description: `Etapa "${stage.name}" excluída. ${moved.count} cliente(s) movido(s) para "${target.name}".`,
+  });
+
+  revalidatePath(`/funis/${stage.funnelId}`);
+  revalidatePath("/funis");
+  revalidatePath("/dashboard");
+  return { ok: true };
+}

@@ -181,6 +181,66 @@ export async function addObservation(
   return { ok: true };
 }
 
+export async function deleteClient(
+  clientId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Não autenticado." };
+
+  const client = await prisma.client.findUnique({
+    where: { id: clientId },
+    select: { id: true, fullName: true, listId: true },
+  });
+  if (!client) return { ok: false, error: "Cliente não encontrado." };
+
+  await prisma.client.update({
+    where: { id: clientId },
+    data: { deletedAt: new Date() },
+  });
+  await clientHistory({
+    clientId,
+    userId: user.id,
+    type: "ARQUIVADO",
+    description: "Cliente excluído (soft delete).",
+  });
+  await audit({
+    userId: user.id,
+    entity: "Client",
+    entityId: clientId,
+    action: "DELETE",
+    description: `Cliente ${client.fullName} excluído.`,
+  });
+
+  revalidatePath("/funis");
+  revalidatePath("/clientes");
+  revalidatePath("/dashboard");
+  if (client.listId) revalidatePath(`/clientes/${client.listId}`);
+  return { ok: true };
+}
+
+export interface ObservationView {
+  id: string;
+  text: string;
+  userName: string | null;
+  createdAt: string;
+}
+
+export async function getObservations(clientId: string): Promise<ObservationView[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+  const rows = await prisma.observation.findMany({
+    where: { clientId },
+    orderBy: { createdAt: "desc" },
+    include: { user: { select: { name: true } } },
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    text: r.text,
+    userName: r.user?.name ?? null,
+    createdAt: r.createdAt.toISOString(),
+  }));
+}
+
 function parseMoney(value: FormDataEntryValue | null): number | null {
   if (!value) return null;
   const n = Number(String(value).replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", "."));
